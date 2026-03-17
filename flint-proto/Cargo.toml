@@ -1,0 +1,17 @@
+[package]
+name = "flint-proto"
+version = "0.1.0"
+edition = "2024"
+description = "Shared packet types and mesh routing primitives for the FlintMesh sensor network (no_std)"
+readme = "README.md"
+
+# no_std — usable on embedded nodes AND the std gateway
+[dependencies]
+postcard = { version = "1", default-features = false, features = ["experimental-derive"] }
+serde    = { version = "1", default-features = false, features = ["derive"] }
+heapless = { version = "0.8", default-features = false }
+defmt    = { version = "1", optional = true }
+
+[features]
+default = []
+defmt   = ["dep:defmt"]

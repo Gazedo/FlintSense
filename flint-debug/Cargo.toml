@@ -1,0 +1,34 @@
+[package]
+name = "flint-debug"
+version = "0.1.0"
+edition = "2024"
+description = "LoRa receive + mesh relay debug firmware for Heltec WiFi LoRa 32 V2 (ESP32)"
+readme = "README.md"
+
+[[bin]]
+name = "flint-debug"
+path = "src/main.rs"
+
+[dependencies]
+flint-proto = { path = "../flint-proto", features = ["defmt"] }
+
+# ESP-HAL 1.0 stack
+esp-hal                = { version = "1.0", features = ["esp32", "unstable"] }
+esp-rtos               = { version = "0.2", features = ["esp32", "embassy"] }
+esp-bootloader-esp-idf = { version = "0.4", features = ["esp32"] }
+esp-backtrace          = { version = "0.18", features = ["esp32", "panic-handler", "println"] }
+esp-println            = { version = "0.16", features = ["esp32", "log-04"] }
+
+# Embassy async runtime (pulled transitively by esp-rtos but needed for #[task] and Spawner)
+embassy-executor = { version = "0.9" }
+embassy-time     = { version = "0.5" }
+
+# LoRa radio driver — SX1276 on Heltec V2
+lora-phy         = { version = "3" }
+
+# SPI device abstraction (SpiBus + CS pin → SpiDevice for lora-phy)
+embedded-hal-bus = { version = "0.2", features = ["async"] }
+
+# Logging
+defmt     = "1"
+defmt-rtt = "1"

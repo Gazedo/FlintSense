@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "flint-proto",
+    "flint-debug",
+]
+resolver = "2"
+
+[profile.dev]
+opt-level = "s"
+debug = true
+
+[profile.release]
+opt-level = "s"
