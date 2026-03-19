@@ -2,6 +2,7 @@
 members = [
     "flint-proto",
     "flint-debug",
+    "flint-node",
 ]
 resolver = "2"
 

@@ -1,9 +1,9 @@
-# kindle-debug
+# flint-debug
 
 LoRa receive + transparent mesh relay firmware for the
 **Heltec WiFi LoRa 32 V2** (ESP32 + SX1276).
 
-This is the first firmware target in the KindleSense bring-up sequence.
+This is the first firmware target in the FlintSense bring-up sequence.
 It serves two purposes:
 
 1. **Debug receiver** — decodes incoming `MeshEnvelope` packets and logs them
@@ -47,7 +47,7 @@ record them from the Arduino TX sketch during the loopback test.
 
 ```bash
 # From workspace root — requires Xtensa toolchain (espup install)
-cd kindle-debug
+cd flint-debug
 cargo run --release
 ```
 

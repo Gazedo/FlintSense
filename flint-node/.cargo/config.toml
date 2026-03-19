@@ -1,0 +1,11 @@
+[target.xtensa-esp32-none-elf]
+runner = "espflash flash --monitor --baud 921600 --port /dev/cu.usbserial-0001"
+
+[build]
+target = "xtensa-esp32-none-elf"
+
+[unstable]
+build-std = ["core"]
+
+[env]
+ESP_LOG = "INFO"

@@ -1,4 +1,4 @@
-# KindleSense — Wildfire Early Warning Sensor Network
+# FlintSense — Wildfire Early Warning Sensor Network
 
 A distributed, solar-powered LoRa sensor network that measures fire-weather
 conditions in real time.  Nodes report data compatible with the
@@ -18,7 +18,7 @@ Raspberry Pi.
 │                        LoRa Mesh                            │
 │                                                             │
 │   [Sensor Node] ──LoRa──▶ [Relay Node] ──LoRa──▶ [Gateway] │
-│   (kindle-node)           (kindle-debug)          (kindle-  │
+│   (flint-node)           (flint-debug)          (flint-  │
 │                                                    gateway) │
 └─────────────────────────────────────────────────────────────┘
          │                                        │
@@ -30,7 +30,7 @@ Raspberry Pi.
 
 Mesh routing uses flood routing with hop-limit deduplication — the same
 semantics as [Meshtastic](https://meshtastic.org/).  All packet types and
-routing logic live in the shared `kindle-proto` crate so embedded nodes and
+routing logic live in the shared `flint-proto` crate so embedded nodes and
 the gateway always agree on the wire format.
 
 ---
@@ -39,10 +39,10 @@ the gateway always agree on the wire format.
 
 | Crate | Target | Description |
 |---|---|---|
-| [`kindle-proto`](./kindle-proto) | `no_std` (any) | Shared packet types, mesh envelope, seen-packet cache, postcard encode/decode |
-| [`kindle-debug`](./kindle-debug) | `xtensa-esp32-none-elf` | LoRa RX + transparent mesh relay on Heltec WiFi LoRa 32 V2 |
-| `kindle-node` *(planned)* | `riscv32imc-unknown-none-elf` | Full sensor node firmware for M5Stack Stamp-C3U |
-| `kindle-gateway` *(planned)* | host (RPi) | Packet receiver, InfluxDB writer, Grafana integration |
+| [`flint-proto`](./flint-proto) | `no_std` (any) | Shared packet types, mesh envelope, seen-packet cache, postcard encode/decode |
+| [`flint-debug`](./flint-debug) | `xtensa-esp32-none-elf` | LoRa RX + transparent mesh relay on Heltec WiFi LoRa 32 V2 |
+| `flint-node` *(planned)* | `riscv32imc-unknown-none-elf` | Full sensor node firmware for M5Stack Stamp-C3U |
+| `flint-gateway` *(planned)* | host (RPi) | Packet receiver, InfluxDB writer, Grafana integration |
 
 ---
 
@@ -96,11 +96,11 @@ Mac: install the [CP2102 USB driver](https://www.silabs.com/developers/usb-to-ua
 ### Build
 
 ```bash
-# Check all crates compile (host target — for kindle-proto only)
-cargo check -p kindle-proto
+# Check all crates compile (host target — for flint-proto only)
+cargo check -p flint-proto
 
 # Build debug receiver firmware (requires Xtensa toolchain)
-cd kindle-debug
+cd flint-debug
 cargo build --release
 ```
 
@@ -113,7 +113,7 @@ cargo doc --workspace --no-deps --open
 ### Flash & Monitor
 
 ```bash
-cd kindle-debug
+cd flint-debug
 # Edit .cargo/config.toml to set your actual USB port, then:
 cargo run --release
 ```
@@ -135,12 +135,12 @@ cargo doc --workspace --no-deps --open
 1. **Arduino loopback** — Flash Heltec Arduino TX/RX examples on two V2 boards.
    Confirm RF link.  Record exact SF / BW / frequency / sync word — these become
    the Rust firmware targets.
-2. **Rust RX ↔ Arduino TX** — `kindle-debug` receiving from Arduino TX proves
+2. **Rust RX ↔ Arduino TX** — `flint-debug` receiving from Arduino TX proves
    `lora-phy` driver config is correct.
 3. **Full Rust both sides** — Embassy firmware on both boards.
 4. **Add I2C sensors** — SHT40 first, then MAX17048.
 5. **Anemometer pulse counting** — GPIO interrupt task.
-6. **RPi gateway** — `kindle-gateway` receiving packets, writing to InfluxDB.
+6. **RPi gateway** — `flint-gateway` receiving packets, writing to InfluxDB.
 7. **SDR passive monitor** — `gr-lora_sdr` chirp waterfall for demos and debugging.
 
 ---
@@ -148,7 +148,7 @@ cargo doc --workspace --no-deps --open
 ## Packet Format
 
 Wire format is [postcard](https://github.com/jamesmunns/postcard)-encoded
-`MeshEnvelope<KindlePayload>`, approximately 20–24 bytes per sensor reading.
+`MeshEnvelope<FlintPayload>`, approximately 20–24 bytes per sensor reading.
 
 ```
 MeshEnvelope {
@@ -157,7 +157,7 @@ MeshEnvelope {
     packet_id:  u32   // random, used for dedup
     hop_limit:  u8    // decremented on each relay (default 3)
     hop_start:  u8    // original hop_limit
-    payload:    KindlePayload::SensorReading {
+    payload:    FlintPayload::SensorReading {
         node_id:       u8
         temp_c:        i16   // °C × 100
         humidity_pct:  u8

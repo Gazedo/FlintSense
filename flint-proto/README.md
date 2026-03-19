@@ -1,6 +1,6 @@
-# kindle-proto
+# flint-proto
 
-Shared packet types and mesh routing primitives for the KindleSense sensor
+Shared packet types and mesh routing primitives for the FlintSense sensor
 network.
 
 This crate is `no_std` and is a dependency of every other crate in the
@@ -12,7 +12,7 @@ gateway all use the same types to guarantee wire-format compatibility.
 | Item | Description |
 |---|---|
 | `WeatherPacket` | Fire-weather sensor reading (temperature, humidity, wind, fuel moisture, battery) |
-| `KindlePayload` | Enum of all application-layer message types |
+| `FlintPayload` | Enum of all application-layer message types |
 | `MeshEnvelope` | Flood-routing wrapper — same hop-limit semantics as Meshtastic |
 | `SeenCache` | Fixed-capacity ring cache for seen-packet deduplication |
 | `encode` / `decode` | postcard serialization helpers |
@@ -26,5 +26,5 @@ gateway all use the same types to guarantee wire-format compatibility.
 ## Generating Docs
 
 ```bash
-cargo doc -p kindle-proto --open
+cargo doc -p flint-proto --open
 ```

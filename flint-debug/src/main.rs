@@ -9,9 +9,10 @@
 //!   4. Any received packet that doesn't decode as a MeshEnvelope is hex-dumped
 //!      so you can inspect raw Arduino packets before full Rust TX is ready.
 //!
-//! ## Heltec V2 pin mapping (SX1276 via SPI2)
+//! ## Heltec V2 pin mapping
 //!
-//!   SCK GPIO5  MISO GPIO19  MOSI GPIO27  CS GPIO18  RST GPIO14  DIO0 GPIO26
+//!   SPI2 (SX1276): SCK GPIO5  MISO GPIO19  MOSI GPIO27  CS GPIO18  RST GPIO14  DIO0 GPIO26
+//!   I2C0 (OLED):   SDA GPIO4  SCL GPIO15   RST GPIO16
 //!
 //! ## Meshtastic US LongFast (future interop target)
 //!
@@ -20,34 +21,37 @@
 #![no_std]
 #![no_main]
 
-use defmt::{error, info, warn};
-use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_time::Delay;
+use embassy_time::{Delay, Timer};
+use embedded_graphics::{
+    mono_font::{MonoTextStyleBuilder, ascii::FONT_6X10},
+    pixelcolor::BinaryColor,
+    prelude::*,
+    text::{Baseline, Text},
+};
 use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
+    i2c::master::{Config as I2cConfig, I2c},
     spi::{
-        master::{Config as SpiConfig, Spi},
         Mode,
+        master::{Config as SpiConfig, Spi},
     },
     time::Rate,
     timer::timg::TimerGroup,
 };
-use flint_proto::{decode, encode, FlintPayload, SeenCache, MAX_PACKET_BYTES};
+use flint_proto::{FlintPayload, MAX_PACKET_BYTES, SeenCache, decode, encode};
+use log::{error, info, warn};
 use lora_phy::{
+    LoRa, RxMode,
     iv::GenericSx127xInterfaceVariant,
     mod_params::{Bandwidth, CodingRate, SpreadingFactor},
     sx127x::{Config as Sx127xConfig, Sx127x, Sx1276},
-    LoRa, RxMode,
 };
+use ssd1306::{I2CDisplayInterface, Ssd1306, prelude::*};
 
 esp_bootloader_esp_idf::esp_app_desc!();
-
-// defmt 1.0 requires a timestamp implementation.
-// Using embassy_time for microsecond-resolution timestamps.
-defmt::timestamp!("{=u64:us}", embassy_time::Instant::now().as_micros());
 
 // ── LoRa channel config ───────────────────────────────────────────────────────
 //
@@ -66,6 +70,51 @@ const LORA_CR: CodingRate = CodingRate::_4_5;
 const LORA_PUBLIC_NETWORK: bool = false;
 const LORA_TX_POWER_DBM: i32 = 14;
 
+// ── Display / formatting helpers ──────────────────────────────────────────────
+
+/// Format "RX: {count}" into `buf` without heap allocation.
+fn fmt_count(buf: &mut [u8; 16], count: u32) -> &str {
+    buf[..4].copy_from_slice(b"RX: ");
+    let mut digits = [0u8; 10];
+    let mut ndig = 0usize;
+    let mut n = count;
+    if n == 0 {
+        digits[0] = b'0';
+        ndig = 1;
+    } else {
+        while n > 0 {
+            digits[ndig] = b'0' + (n % 10) as u8;
+            n /= 10;
+            ndig += 1;
+        }
+    }
+    let mut pos = 4usize;
+    for i in (0..ndig).rev() {
+        buf[pos] = digits[i];
+        pos += 1;
+    }
+    core::str::from_utf8(&buf[..pos]).unwrap()
+}
+
+/// Format a byte slice as space-separated hex into `buf` (max 32 bytes → 95 chars).
+fn fmt_hex<'a>(buf: &'a mut [u8; 95], data: &[u8]) -> &'a str {
+    const HEX: &[u8] = b"0123456789abcdef";
+    let mut pos = 0;
+    for &b in data {
+        if pos + 3 > buf.len() {
+            break;
+        }
+        buf[pos] = HEX[(b >> 4) as usize];
+        buf[pos + 1] = HEX[(b & 0xf) as usize];
+        buf[pos + 2] = b' ';
+        pos += 3;
+    }
+    if pos > 0 {
+        pos -= 1; // trim trailing space
+    }
+    core::str::from_utf8(&buf[..pos]).unwrap_or("")
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 #[esp_rtos::main]
@@ -75,7 +124,50 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    info!("kindle-debug booting");
+    // Initialise the log backend — reads ESP_LOG env var set in .cargo/config.toml.
+    esp_println::logger::init_logger_from_env();
+
+    info!("flint-debug booting");
+
+    // ── OLED (SSD1306 128×64 via I2C0, SDA=GPIO4, SCL=GPIO15, RST=GPIO16) ───
+
+    let mut oled_rst = Output::new(peripherals.GPIO16, Level::High, OutputConfig::default());
+    oled_rst.set_low();
+    Timer::after_millis(10).await;
+    oled_rst.set_high();
+    Timer::after_millis(10).await;
+
+    let i2c = I2c::new(peripherals.I2C0, I2cConfig::default())
+        .unwrap()
+        .with_sda(peripherals.GPIO4)
+        .with_scl(peripherals.GPIO15);
+
+    let interface = I2CDisplayInterface::new(i2c);
+    let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
+        .into_buffered_graphics_mode();
+    display.init().unwrap();
+
+    let text_style = MonoTextStyleBuilder::new()
+        .font(&FONT_6X10)
+        .text_color(BinaryColor::On)
+        .build();
+
+    // Boot screen
+    display.clear(BinaryColor::Off).unwrap();
+    Text::with_baseline(
+        "FlintMesh Debug",
+        Point::new(0, 0),
+        text_style,
+        Baseline::Top,
+    )
+    .draw(&mut display)
+    .unwrap();
+    Text::with_baseline("RX: 0", Point::new(0, 20), text_style, Baseline::Top)
+        .draw(&mut display)
+        .unwrap();
+    display.flush().unwrap();
+
+    let mut rx_count: u32 = 0;
 
     // ── SPI2 for SX1276 ──────────────────────────────────────────────────────
 
@@ -99,12 +191,13 @@ async fn main(_spawner: Spawner) {
     // ── SX1276 interface variant (reset + DIO0 IRQ + optional RF switches) ────
 
     let reset = Output::new(peripherals.GPIO14, Level::High, OutputConfig::default());
-    let dio0 = Input::new(peripherals.GPIO26, InputConfig::default().with_pull(Pull::Down));
+    let dio0 = Input::new(
+        peripherals.GPIO26,
+        InputConfig::default().with_pull(Pull::Down),
+    );
 
     let iv = GenericSx127xInterfaceVariant::new(
-        reset,
-        dio0,
-        None, // rf_switch_rx — not needed on Heltec V2
+        reset, dio0, None, // rf_switch_rx — not needed on Heltec V2
         None, // rf_switch_tx — not needed on Heltec V2
     )
     .unwrap();
@@ -118,9 +211,13 @@ async fn main(_spawner: Spawner) {
         rx_boost: false,
     };
 
-    let mut lora = LoRa::new(Sx127x::new(spi_dev, iv, sx_config), LORA_PUBLIC_NETWORK, Delay)
-        .await
-        .expect("LoRa init failed — check SPI wiring and pin assignments");
+    let mut lora = LoRa::new(
+        Sx127x::new(spi_dev, iv, sx_config),
+        LORA_PUBLIC_NETWORK,
+        Delay,
+    )
+    .await
+    .expect("LoRa init failed — check SPI wiring and pin assignments");
 
     // ── Modulation + packet params ────────────────────────────────────────────
 
@@ -146,8 +243,11 @@ async fn main(_spawner: Spawner) {
     // ── Main receive loop ─────────────────────────────────────────────────────
 
     loop {
-        if let Err(e) = lora.prepare_for_rx(RxMode::Single(0), &mdm, &rx_params).await {
-            error!("prepare_for_rx: {:?}", defmt::Debug2Format(&e));
+        if let Err(e) = lora
+            .prepare_for_rx(RxMode::Continuous, &mdm, &rx_params)
+            .await
+        {
+            error!("prepare_for_rx: {:?}", e);
             continue;
         }
 
@@ -156,27 +256,49 @@ async fn main(_spawner: Spawner) {
         let (len, status) = match lora.rx(&rx_params, &mut rx_buf).await {
             Ok(r) => r,
             Err(e) => {
-                warn!("rx: {:?}", defmt::Debug2Format(&e));
+                warn!("rx: {:?}", e);
                 continue;
             }
         };
 
+        rx_count = rx_count.saturating_add(1);
+
+        // Update OLED counter
+        let mut count_buf = [0u8; 16];
+        let count_str = fmt_count(&mut count_buf, rx_count);
+        display.clear(BinaryColor::Off).unwrap();
+        Text::with_baseline(
+            "FlintMesh Debug",
+            Point::new(0, 0),
+            text_style,
+            Baseline::Top,
+        )
+        .draw(&mut display)
+        .unwrap();
+        Text::with_baseline(count_str, Point::new(0, 20), text_style, Baseline::Top)
+            .draw(&mut display)
+            .unwrap();
+        display.flush().unwrap();
+
         let raw = &rx_buf[..len as usize];
-        info!("RX {} bytes  RSSI={}dBm  SNR={}dB", len, status.rssi, status.snr);
+        info!(
+            "RX {} bytes  RSSI={}dBm  SNR={}dB",
+            len, status.rssi, status.snr
+        );
 
         // ── Decode ────────────────────────────────────────────────────────────
 
         match decode(raw) {
             Ok(envelope) => {
                 info!(
-                    "  KindlePacket  from=0x{:08x}  id=0x{:08x}  hops={}/{}",
+                    "  FlintPacket  from=0x{:08x}  id=0x{:08x}  hops={}/{}",
                     envelope.from, envelope.packet_id, envelope.hop_limit, envelope.hop_start,
                 );
 
                 match &envelope.payload {
                     FlintPayload::SensorReading(w) => {
                         info!(
-                            "  node={}  {}.{:02}°C  {}%RH  {}×0.5m/s@{}°  \
+                            "  node={}  {}.{:02}C  {}%RH  {}x0.5m/s@{}deg  \
                              fuel={}%  batt={}%/{}mV  seq={}",
                             w.node_id,
                             w.temp_c / 100,
@@ -201,7 +323,12 @@ async fn main(_spawner: Spawner) {
                             match encode(&relay, &mut tx_buf) {
                                 Ok(bytes) => {
                                     match lora
-                                        .prepare_for_tx(&mdm, &mut tx_params, LORA_TX_POWER_DBM, bytes)
+                                        .prepare_for_tx(
+                                            &mdm,
+                                            &mut tx_params,
+                                            LORA_TX_POWER_DBM,
+                                            bytes,
+                                        )
                                         .await
                                     {
                                         Ok(_) => match lora.tx().await {
@@ -209,14 +336,12 @@ async fn main(_spawner: Spawner) {
                                                 "  RELAY id=0x{:08x}  hops_left={}",
                                                 relay.packet_id, relay.hop_limit
                                             ),
-                                            Err(e) => warn!("tx: {:?}", defmt::Debug2Format(&e)),
+                                            Err(e) => warn!("tx: {:?}", e),
                                         },
-                                        Err(e) => {
-                                            warn!("prepare_for_tx: {:?}", defmt::Debug2Format(&e))
-                                        }
+                                        Err(e) => warn!("prepare_for_tx: {:?}", e),
                                     }
                                 }
-                                Err(e) => warn!("encode: {:?}", defmt::Debug2Format(&e)),
+                                Err(e) => warn!("encode: {:?}", e),
                             }
                         }
                         None => info!("  hop_limit=0 — local delivery only"),
@@ -227,11 +352,11 @@ async fn main(_spawner: Spawner) {
             }
 
             Err(_) => {
-                // Not a KindlePacket — probably the Arduino default sketch or noise.
+                // Not a FlintPacket — probably the Arduino default sketch or noise.
                 // Hex-dump to see what the transmitter is actually sending.
                 let dump = raw.len().min(32);
-                info!("  unknown format — first {} bytes:", dump);
-                info!("  {:02x}", &raw[..dump]);
+                let mut hex_buf = [0u8; 95];
+                info!("  unknown format — {}", fmt_hex(&mut hex_buf, &raw[..dump]));
             }
         }
     }

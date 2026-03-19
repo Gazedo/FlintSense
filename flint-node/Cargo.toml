@@ -1,16 +1,16 @@
 [package]
-name = "flint-debug"
+name = "flint-node"
 version = "0.1.0"
 edition = "2024"
-description = "LoRa receive + mesh relay debug firmware for Heltec WiFi LoRa 32 V2 (ESP32)"
+description = "LoRa transmit test firmware for Heltec WiFi LoRa 32 V2 (ESP32)"
 readme = "README.md"
 
 [[bin]]
-name = "flint-debug"
+name = "flint-node"
 path = "src/main.rs"
 
 [dependencies]
-flint-proto = { path = "../flint-proto", features = ["defmt"] }
+flint-proto = { path = "../flint-proto" }
 
 # ESP-HAL 1.0 stack
 esp-hal                = { version = "1.0", features = ["esp32", "unstable"] }
