@@ -1,4 +1,4 @@
-# FlintSense — Wildfire Early Warning Sensor Network
+# FlintMesh — Wildfire Early Warning Sensor Network
 
 A distributed, solar-powered LoRa sensor network that measures fire-weather
 conditions in real time.  Nodes report data compatible with the
@@ -18,12 +18,12 @@ Raspberry Pi.
 │                        LoRa Mesh                            │
 │                                                             │
 │   [Sensor Node] ──LoRa──▶ [Relay Node] ──LoRa──▶ [Gateway] │
-│   (flint-node)           (flint-debug)          (flint-  │
+│   (flint-node)           (flint-debug)          (flint-   │
 │                                                    gateway) │
 └─────────────────────────────────────────────────────────────┘
          │                                        │
          │  Embassy async / no_std                │  std / Tokio
-         │  ESP32 / ESP32-C3                      │  Raspberry Pi
+         │  ESP32                                 │  Raspberry Pi
                                                   │
                                            InfluxDB + Grafana
 ```
@@ -41,7 +41,7 @@ the gateway always agree on the wire format.
 |---|---|---|
 | [`flint-proto`](./flint-proto) | `no_std` (any) | Shared packet types, mesh envelope, seen-packet cache, postcard encode/decode |
 | [`flint-debug`](./flint-debug) | `xtensa-esp32-none-elf` | LoRa RX + transparent mesh relay on Heltec WiFi LoRa 32 V2 |
-| `flint-node` *(planned)* | `riscv32imc-unknown-none-elf` | Full sensor node firmware for M5Stack Stamp-C3U |
+| [`flint-node`](./flint-node) | `xtensa-esp32-none-elf` | Sensor node firmware on Heltec WiFi LoRa 32 V2 (TX test → real sensors in progress) |
 | `flint-gateway` *(planned)* | host (RPi) | Packet receiver, InfluxDB writer, Grafana integration |
 
 ---
@@ -60,8 +60,10 @@ the gateway always agree on the wire format.
 
 ## Hardware
 
-### Development (Phase 0)
-- **Heltec WiFi LoRa 32 V2** — ESP32 + SX1276 + OLED, used for firmware development and as the debug/relay node
+### Development (Phase 0) — current
+- **Heltec WiFi LoRa 32 V2** — ESP32 + SX1276 + OLED, used for all firmware
+  development.  Two boards: one running `flint-node` (TX), one running
+  `flint-debug` (RX + relay).
 
 ### Production Node (Phase 1)
 - **M5Stack Stamp-C3U** (ESP32-C3, ~5 µA deep sleep) + harvested SX1276
@@ -82,47 +84,41 @@ the gateway always agree on the wire format.
 
 ```bash
 cargo install espup && espup install   # Xtensa toolchain + export-esp.sh
-cargo install ldproxy                  # Required linker proxy
 cargo install espflash
 ```
 
-Add to `~/.zshrc` (Mac):
+Add to `~/.zshrc` (or source before each session):
 ```bash
 . $HOME/export-esp.sh
 ```
 
-Mac: install the [CP2102 USB driver](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers) before connecting any board.
+Mac: install the [CP2102 USB driver](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)
+before connecting any board.
 
 ### Build
 
 ```bash
-# Check all crates compile (host target — for flint-proto only)
-cargo check -p flint-proto
+# Build all crates
+cargo build --workspace
 
-# Build debug receiver firmware (requires Xtensa toolchain)
-cd flint-debug
-cargo build --release
-```
-
-### Documentation
-
-```bash
-cargo doc --workspace --no-deps --open
+# Or a single crate
+cargo build -p flint-node
+cargo build -p flint-debug
 ```
 
 ### Flash & Monitor
 
+Set your USB port in `.cargo/config.toml` (workspace root), then:
+
 ```bash
-cd flint-debug
-# Edit .cargo/config.toml to set your actual USB port, then:
-cargo run --release
+# Flash and open serial monitor
+cd flint-node  && cargo run --release
+cd flint-debug && cargo run --release
 ```
 
-Logs stream over RTT via `espflash --monitor`.  Received LoRa packets are
-decoded and printed; unknown-format packets are hex-dumped for debugging
-against the Arduino default firmware.
+Log output streams over UART via `espflash --monitor`.
 
-### Generate Documentation
+### Documentation
 
 ```bash
 cargo doc --workspace --no-deps --open
@@ -132,16 +128,15 @@ cargo doc --workspace --no-deps --open
 
 ## Bring-up Sequence
 
-1. **Arduino loopback** — Flash Heltec Arduino TX/RX examples on two V2 boards.
-   Confirm RF link.  Record exact SF / BW / frequency / sync word — these become
-   the Rust firmware targets.
-2. **Rust RX ↔ Arduino TX** — `flint-debug` receiving from Arduino TX proves
-   `lora-phy` driver config is correct.
-3. **Full Rust both sides** — Embassy firmware on both boards.
-4. **Add I2C sensors** — SHT40 first, then MAX17048.
-5. **Anemometer pulse counting** — GPIO interrupt task.
-6. **RPi gateway** — `flint-gateway` receiving packets, writing to InfluxDB.
-7. **SDR passive monitor** — `gr-lora_sdr` chirp waterfall for demos and debugging.
+| Step | Status | Description |
+|---|---|---|
+| 1 | ✅ | **Arduino loopback** — confirmed RF link on two Heltec V2 boards |
+| 2 | ✅ | **Rust RX ↔ Arduino TX** — `flint-debug` receiving from factory firmware, validated `lora-phy` config |
+| 3 | ✅ | **Full Rust both sides** — `flint-node` TX and `flint-debug` RX passing `MeshEnvelope` packets end-to-end |
+| 4 | 🔄 | **Sensor integration** — fuel moisture (ADC resistive dowel), SHT40 (I2C), MAX17048 (I2C) |
+| 5 | ⬜ | **Anemometer pulse counting** — GPIO interrupt task |
+| 6 | ⬜ | **RPi gateway** — `flint-gateway` receiving packets, writing to InfluxDB |
+| 7 | ⬜ | **SDR passive monitor** — `gr-lora_sdr` chirp waterfall for demos and debugging |
 
 ---
 
@@ -163,7 +158,7 @@ MeshEnvelope {
         humidity_pct:  u8
         wind_speed_ms: u8    // m/s × 2
         wind_dir_deg:  u16
-        fuel_moisture: u8
+        fuel_moisture: u8    // 0–100 %, resistive wood dowel
         battery_soc:   u8
         battery_mv:    u16
         sequence:      u16

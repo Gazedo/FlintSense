@@ -15,7 +15,7 @@ flint-proto = { path = "../flint-proto", features = ["defmt"] }
 # ESP-HAL 1.0 stack
 esp-hal                = { version = "1.0", features = ["esp32", "unstable"] }
 esp-rtos               = { version = "0.2", features = ["esp32", "embassy"] }
-esp-bootloader-esp-idf = { version = "0.4", features = ["esp32"] }
+esp-bootloader-esp-idf = { version = "0.5", features = ["esp32"] }
 esp-backtrace          = { version = "0.18", features = ["esp32", "panic-handler", "println"] }
 esp-println            = { version = "0.16", features = ["esp32", "log-04"] }
 

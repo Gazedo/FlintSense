@@ -1,11 +1,8 @@
-[target.xtensa-esp32-none-elf]
-runner = "espflash flash --monitor --baud 921600 --port /dev/cu.usbserial-0001"
+[target.thumbv7em-none-eabihf]
+runner = "probe-rs run --chip nRF52840_xxAA"
 
 [build]
-target = "xtensa-esp32-none-elf"
-
-[unstable]
-build-std = ["core"]
+target = "thumbv7em-none-eabihf"
 
 [env]
-ESP_LOG = "INFO"
+DEFMT_LOG = "info"

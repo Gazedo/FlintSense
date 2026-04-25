@@ -2,7 +2,7 @@
 name = "flint-node"
 version = "0.1.0"
 edition = "2024"
-description = "LoRa transmit test firmware for Heltec WiFi LoRa 32 V2 (ESP32)"
+description = "LoRa sensor node firmware for RAK4631 (nRF52840 + SX1262)"
 readme = "README.md"
 
 [[bin]]
@@ -12,26 +12,22 @@ path = "src/main.rs"
 [dependencies]
 flint-proto = { path = "../flint-proto" }
 
-# ESP-HAL 1.0 stack
-esp-hal                = { version = "1.0", features = ["esp32", "unstable"] }
-esp-rtos               = { version = "0.2", features = ["esp32", "embassy"] }
-esp-bootloader-esp-idf = { version = "0.4", features = ["esp32"] }
-esp-backtrace          = { version = "0.18", features = ["esp32", "panic-handler", "println"] }
-esp-println            = { version = "0.16", features = ["esp32", "log-04"] }
-
-# Embassy async runtime (pulled transitively by esp-rtos but needed for #[task] and Spawner)
-embassy-executor = { version = "0.9" }
+# Embassy + nRF52840 HAL
+embassy-executor = { version = "0.10", features = ["platform-cortex-m", "executor-thread"] }
+embassy-nrf      = { version = "0.10", features = ["nrf52840", "time-driver-rtc1", "gpiote"] }
 embassy-time     = { version = "0.5" }
 
-# LoRa radio driver — SX1276 on Heltec V2
+# LoRa radio driver — SX1262 on RAK4631
 lora-phy         = { version = "3" }
 
 # SPI device abstraction (SpiBus + CS pin → SpiDevice for lora-phy)
 embedded-hal-bus = { version = "0.2", features = ["async"] }
 
-# OLED display (SSD1306 on Heltec V2 via I2C)
-ssd1306           = { version = "0.9" }
-embedded-graphics = { version = "0.8" }
+# Logging / panic via RTT + probe-rs
+defmt       = { version = "0.3" }
+defmt-rtt   = { version = "0.4" }
+panic-probe = { version = "0.3", features = ["print-defmt"] }
 
-# Logging
-log = { version = "0.4", default-features = false }
+# Cortex-M runtime
+cortex-m    = { version = "0.7", features = ["inline-asm", "critical-section-single-core"] }
+cortex-m-rt = { version = "0.7" }

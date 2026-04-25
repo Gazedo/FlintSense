@@ -43,11 +43,29 @@ pub const DEFAULT_HOP_LIMIT: u8 = 3;
 /// Capacity of the seen-packet deduplication cache (number of packet IDs).
 pub const SEEN_CACHE_SIZE: usize = 64;
 
+// ── Power status flags ────────────────────────────────────────────────────────
+
+/// Bit flags carried in [`WeatherPacket::power_flags`].
+pub mod power_flags {
+    /// SOC has fallen below the low-battery threshold (default 20 %).
+    pub const LOW_SOC: u8 = 1 << 0;
+    /// Battery is currently discharging (CRATE < 0) — no net solar harvest.
+    pub const NEGATIVE_TREND: u8 = 1 << 1;
+    /// Solar charger is actively delivering current to the battery.
+    pub const CHARGING: u8 = 1 << 2;
+    /// SOC has fallen below the critical threshold (default 10 %) —
+    /// gateway should alert immediately.
+    pub const CRITICAL_SOC: u8 = 1 << 3;
+}
+
 // ── Payload types ────────────────────────────────────────────────────────────
 
 /// Fire-weather sensor reading from a single node.
 ///
 /// All values use scaled integers to avoid floating point on embedded targets.
+///
+/// ## Wire size
+/// Postcard-encoded inside a `MeshEnvelope`: ~33 bytes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct WeatherPacket {
@@ -75,6 +93,16 @@ pub struct WeatherPacket {
 
     /// Battery terminal voltage in millivolts.
     pub battery_mv: u16,
+
+    /// Instantaneous solar charge current in milliamps (from INA219 on charge line).
+    /// Zero when no solar input.
+    pub solar_ma: u16,
+
+    /// Instantaneous node load current in milliamps (from INA219 on 3.3 V rail).
+    pub load_ma: u16,
+
+    /// Power status bit flags — see [`power_flags`] constants.
+    pub power_flags: u8,
 
     /// Monotonic per-node packet counter — use to detect dropped packets.
     pub sequence: u16,
@@ -205,7 +233,13 @@ impl Default for SeenCache {
 
 /// Maximum serialized size of a `MeshEnvelope` containing a `WeatherPacket`.
 /// Used to size stack buffers for postcard encoding — update if fields grow.
-pub const MAX_PACKET_BYTES: usize = 32;
+///
+/// Breakdown (postcard, little-endian fixed-width integers):
+///   MeshEnvelope header  15 bytes  (from/to/packet_id: 3×u32, hop_limit/hop_start: 2×u8, enum tag: 1)
+///   WeatherPacket        18 bytes  (see struct fields)
+///   ─────────────────────────────
+///   Total                33 bytes  → buffer sized to 48 for headroom
+pub const MAX_PACKET_BYTES: usize = 48;
 
 /// Serialize a `MeshEnvelope` into a stack-allocated buffer.
 ///
