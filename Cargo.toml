@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "flint-proto",
-    "flint-node",
+    "flint-node", "flint-gateway", "flint-ui",
 ]
 # flint-debug targets ESP32 (Xtensa) and cannot coexist with nRF52840 targets
 # in a single workspace build due to critical-section and embassy-time conflicts.
