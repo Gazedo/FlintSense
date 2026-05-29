@@ -1,0 +1,3 @@
+[build]
+# Override the workspace-wide thumbv7em target — flint-ui is a native desktop app.
+target = "aarch64-apple-darwin"

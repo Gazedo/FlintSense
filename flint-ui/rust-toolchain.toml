@@ -1,0 +1,3 @@
+[toolchain]
+# flint-ui is a native desktop app — use standard stable, not the ESP Xtensa fork.
+channel = "stable"

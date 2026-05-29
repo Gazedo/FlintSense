@@ -1,0 +1,78 @@
+import { VerticalBox, HorizontalBox, GroupBox } from "std-widgets.slint";
+
+export struct NodeData {
+    node-id: int,
+    temp-c: float,
+    humidity-pct: int,
+    wind-speed-ms: float,
+    wind-dir-deg: int,
+    fuel-moisture: int,
+    battery-soc: int,
+    battery-mv: int,
+    last-seen: string,
+}
+
+export component MainWindow inherits Window {
+    title: "FlintMesh";
+    min-width: 700px;
+    min-height: 400px;
+
+    in property <[NodeData]> nodes;
+    in property <string> mqtt-status: "Disconnected";
+
+    VerticalBox {
+        padding: 16px;
+        spacing: 12px;
+
+        HorizontalBox {
+            Text {
+                text: "FlintMesh";
+                font-size: 22px;
+                font-weight: 700;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text {
+                text: "MQTT: " + root.mqtt-status;
+                font-size: 13px;
+            }
+        }
+
+        if nodes.length == 0: Text {
+            text: "Waiting for nodes...";
+            horizontal-alignment: center;
+        }
+
+        for node in nodes: GroupBox {
+            title: "Node " + node.node-id;
+
+            HorizontalBox {
+                spacing: 20px;
+
+                VerticalBox {
+                    Text { text: "Temp"; font-size: 11px; }
+                    Text { text: node.temp-c + " C"; font-weight: 600; }
+                }
+                VerticalBox {
+                    Text { text: "Humidity"; font-size: 11px; }
+                    Text { text: node.humidity-pct + " %"; font-weight: 600; }
+                }
+                VerticalBox {
+                    Text { text: "Wind"; font-size: 11px; }
+                    Text { text: node.wind-speed-ms + " m/s @ " + node.wind-dir-deg + " deg"; font-weight: 600; }
+                }
+                VerticalBox {
+                    Text { text: "Fuel moisture"; font-size: 11px; }
+                    Text { text: node.fuel-moisture + " %"; font-weight: 600; }
+                }
+                VerticalBox {
+                    Text { text: "Battery"; font-size: 11px; }
+                    Text { text: node.battery-soc + " % / " + node.battery-mv + " mV"; font-weight: 600; }
+                }
+                VerticalBox {
+                    Text { text: "Last seen"; font-size: 11px; }
+                    Text { text: node.last-seen; font-weight: 600; }
+                }
+            }
+        }
+    }
+}
