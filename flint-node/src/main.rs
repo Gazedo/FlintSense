@@ -18,11 +18,13 @@
 use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
+use bosch_bme680::{AsyncBme680, Configuration, DeviceAddress};
 use embassy_nrf::{
     bind_interrupts,
     gpio::{Input, Level, Output, OutputDrive, Pull},
     peripherals,
     spim::{self, Spim},
+    twim::{self, Twim},
 };
 use embassy_time::{Delay, Timer};
 use embedded_hal_bus::spi::ExclusiveDevice;
@@ -36,6 +38,7 @@ use lora_phy::{
 use panic_probe as _;
 
 bind_interrupts!(struct Irqs {
+    TWISPI0 => twim::InterruptHandler<peripherals::TWISPI0>;
     SPIM3 => spim::InterruptHandler<peripherals::SPI3>;
 });
 
@@ -68,6 +71,10 @@ async fn main(_spawner: Spawner) {
     // All RAK4631↔SX1262 connections are internal to the module.
     // To retarget to another board, change these lines only.
 
+    // ── I2C pin assignments (WisBlock sensor slot) ───────────────────────────
+    let pin_sda = p.P0_13;
+    let pin_scl = p.P0_14;
+
     let pin_sck   = p.P1_11; // SPI3 clock
     let pin_mosi  = p.P1_12; // SPI3 MOSI
     let pin_miso  = p.P1_13; // SPI3 MISO
@@ -77,6 +84,21 @@ async fn main(_spawner: Spawner) {
     let pin_busy  = p.P1_14; // SX1262 BUSY — high while radio is processing
     let pin_txen  = p.P1_07; // RF switch: enable TX path
     let pin_rxen  = p.P1_08; // RF switch: enable RX path
+
+    // ── I2C0 for BME680 (RAK1906) ────────────────────────────────────────────
+
+    let mut i2c_buf = [0u8; 256];
+    let i2c = Twim::new(p.TWISPI0, Irqs, pin_sda, pin_scl, twim::Config::default(), &mut i2c_buf);
+    let mut bme680 = AsyncBme680::new(
+        i2c,
+        DeviceAddress::Primary, // 0x76 — SDO tied low on RAK1906
+        Delay,
+        20, // ambient temperature estimate (°C) for gas heater calibration
+    );
+    bme680
+        .initialize(&Configuration::default())
+        .await
+        .expect("BME680 init failed — check RAK1906 seating on WisBlock slot");
 
     // ── SPI3 for SX1262 ──────────────────────────────────────────────────────
 
@@ -133,10 +155,23 @@ async fn main(_spawner: Spawner) {
     // ── Main transmit loop ────────────────────────────────────────────────────
 
     loop {
+        let (temp_c, humidity_pct) = match bme680.measure().await {
+            Ok(m) => {
+                let t = (m.temperature * 100.0) as i16;
+                let h = m.humidity as u8;
+                info!("BME680: {}.{:02}°C  {}%RH", t / 100, (t % 100).unsigned_abs(), h);
+                (t, h)
+            }
+            Err(_) => {
+                error!("BME680 read failed");
+                (0, 0)
+            }
+        };
+
         let payload = FlintPayload::SensorReading(WeatherPacket {
             node_id: NODE_ID,
-            temp_c: 2350, // 23.50 °C placeholder
-            humidity_pct: 60,
+            temp_c,
+            humidity_pct,
             wind_speed_ms: 0,
             wind_dir_deg: 0,
             fuel_moisture: 50,

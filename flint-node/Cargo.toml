@@ -20,6 +20,9 @@ embassy-time     = { version = "0.5" }
 # LoRa radio driver — SX1262 on RAK4631
 lora-phy         = { version = "3" }
 
+# BME680 environmental sensor (RAK1906 WisBlock module)
+bosch-bme680     = { version = "1", features = ["embedded-hal-async"] }
+
 # SPI device abstraction (SpiBus + CS pin → SpiDevice for lora-phy)
 embedded-hal-bus = { version = "0.2", features = ["async"] }
 
