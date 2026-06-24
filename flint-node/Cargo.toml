@@ -16,6 +16,7 @@ flint-proto = { path = "../flint-proto" }
 embassy-executor = { version = "0.10", features = ["platform-cortex-m", "executor-thread"] }
 embassy-nrf      = { version = "0.10", features = ["nrf52840", "time-driver-rtc1", "gpiote"] }
 embassy-time     = { version = "0.5" }
+embassy-sync     = { version = "0.8" }
 
 # LoRa radio driver — SX1262 on RAK4631
 lora-phy         = { version = "3" }
@@ -26,10 +27,12 @@ bosch-bme680     = { version = "1", features = ["embedded-hal-async"] }
 # SPI device abstraction (SpiBus + CS pin → SpiDevice for lora-phy)
 embedded-hal-bus = { version = "0.2", features = ["async"] }
 
-# Logging / panic via RTT + probe-rs
+# Logging via RTT + probe-rs. Panic handling is a custom LED-blink handler in
+# main.rs so failures are visible on bare USB / battery power (no probe attached).
+# Non-blocking RTT: log writes are dropped (not stalled) when no host is draining
+# the buffer, so the firmware runs normally on standalone/battery power.
 defmt       = { version = "0.3" }
-defmt-rtt   = { version = "0.4" }
-panic-probe = { version = "0.3", features = ["print-defmt"] }
+defmt-rtt   = { version = "0.4", features = ["disable-blocking-mode"] }
 
 # Cortex-M runtime
 cortex-m    = { version = "0.7", features = ["inline-asm", "critical-section-single-core"] }

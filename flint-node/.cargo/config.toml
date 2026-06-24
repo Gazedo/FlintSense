@@ -1,3 +1,7 @@
+# `--no-catch-reset` was a band-aid for the factory bootloader/APPROTECT stealing
+# the reset vector. After a one-time `probe-rs erase` (see `make node-erase`) the
+# chip boots the app at 0x0 directly and the debug AP stays open across resets,
+# so catch-reset works normally again.
 [target.thumbv7em-none-eabihf]
 runner = "probe-rs run --chip nRF52840_xxAA"
 
