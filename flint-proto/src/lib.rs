@@ -78,6 +78,12 @@ pub struct WeatherPacket {
     /// Relative humidity, 0–100 %.
     pub humidity_pct: u8,
 
+    /// BME680 MOX gas-sensor resistance in ohms — a total-VOC proxy. Higher =
+    /// cleaner air; a sharp drop indicates VOCs / combustion smoke. Raw value:
+    /// IAQ baseline/index math is done downstream on the gateway. 0 = no valid
+    /// reading (sensor warming up, or gas measurement disabled).
+    pub gas_resistance_ohms: u32,
+
     /// Wind speed in m/s × 2  (e.g. 14 → 7.0 m/s, max ~127 m/s).
     pub wind_speed_ms: u8,
 
@@ -236,9 +242,9 @@ impl Default for SeenCache {
 ///
 /// Breakdown (postcard, little-endian fixed-width integers):
 ///   MeshEnvelope header  15 bytes  (from/to/packet_id: 3×u32, hop_limit/hop_start: 2×u8, enum tag: 1)
-///   WeatherPacket        18 bytes  (see struct fields)
+///   WeatherPacket        ~23 bytes (incl. gas_resistance_ohms: u32, varint ≤5)
 ///   ─────────────────────────────
-///   Total                33 bytes  → buffer sized to 48 for headroom
+///   Total                ~38 bytes → buffer sized to 48 for headroom
 pub const MAX_PACKET_BYTES: usize = 48;
 
 /// Serialize a `MeshEnvelope` into a stack-allocated buffer.
