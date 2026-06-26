@@ -37,3 +37,18 @@ defmt-rtt   = { version = "0.4", features = ["disable-blocking-mode"] }
 # Cortex-M runtime
 cortex-m    = { version = "0.7", features = ["inline-asm", "critical-section-single-core"] }
 cortex-m-rt = { version = "0.7" }
+
+# Standalone workspace — isolated from the ESP32 and host crates so this
+# nRF/thumbv7em crate keeps its own toolchain, target, and feature resolution.
+# See the root Cargo.toml for why the firmware crates are split out.
+[workspace]
+resolver = "2"
+
+# Embedded debug builds at opt-level 0 are too large/slow to flash, so optimize
+# for size in dev too. Preserved from the former shared workspace profile.
+[profile.dev]
+opt-level = "s"
+debug = true
+
+[profile.release]
+opt-level = "s"

@@ -1,5 +1,0 @@
-[build]
-target = "thumbv7em-none-eabihf"
-
-# flint-debug (ESP32/Xtensa) is excluded from this workspace.
-# Build it independently: cd flint-debug && cargo check

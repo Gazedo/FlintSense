@@ -1,12 +1,17 @@
 [workspace]
+# Host-side crates only — these build together for the host/deploy triple.
+# flint-proto is no_std and shared with the firmware crates by path dependency.
 members = [
     "flint-proto",
-    "flint-node", "flint-gateway", "flint-ui",
+    "flint-gateway",
+    "flint-ui",
 ]
-# flint-debug targets ESP32 (Xtensa) and cannot coexist with nRF52840 targets
-# in a single workspace build due to critical-section and embassy-time conflicts.
-# Build it independently: cd flint-debug && cargo check
-exclude = ["flint-debug"]
+# The firmware crates are standalone workspaces: they target different MCUs
+# (flint-node → nRF52840/thumbv7em, flint-debug → ESP32/xtensa) with their own
+# toolchains, build-std settings, and mutually-exclusive critical-section / embassy
+# arch features that cannot share one unified dependency graph.
+# Build each independently: cd flint-node && cargo build
+exclude = ["flint-node", "flint-debug"]
 resolver = "2"
 
 [profile.dev]

@@ -1,1 +1,17 @@
-*target
+# Rust / Cargo build artifacts
+/target
+**/target
+
+# macOS
+.DS_Store
+
+# Logs (boot/flash logs live next to the firmware crates)
+*.log
+
+# Editor local history
+.history/
+
+# Python tooling (flint-hardware)
+__pycache__/
+.venv/
+*.pyc

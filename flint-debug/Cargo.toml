@@ -35,3 +35,18 @@ embedded-graphics = { version = "0.8" }
 
 # Logging
 log = { version = "0.4", default-features = false }
+
+# Standalone workspace — isolated from the nRF and host crates so this
+# ESP32/xtensa crate keeps its own toolchain, build-std, and feature resolution.
+# See the root Cargo.toml for why the firmware crates are split out.
+[workspace]
+resolver = "2"
+
+# Embedded debug builds at opt-level 0 are too large/slow to flash, so optimize
+# for size in dev too. Preserved from the former shared workspace profile.
+[profile.dev]
+opt-level = "s"
+debug = true
+
+[profile.release]
+opt-level = "s"
