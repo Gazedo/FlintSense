@@ -1,0 +1,63 @@
+// ── Rain drop ─────────────────────────────────────────────────────────────────
+// Inherits Rectangle so x can be set at the call site.
+// `phase` (0.0–1.0) staggers each drop so they don't all move together.
+
+component RainDrop inherits Rectangle {
+    in property <float> phase;
+
+    // t cycles 0.0 → 1.0 every 1000 ms, offset by phase
+    property <float> t: mod(animation-tick() / 1ms + phase * 1000, 1000) / 1000;
+
+    width: 2px;
+    height: 9px;
+    border-radius: 1px;
+    background: #4d8fea;
+    y: 54px + t * 50px;    // starts just below cloud base, falls 50px
+    opacity: 0.9 - t * 0.5; // fades as it falls
+}
+
+// ── Rain cloud ────────────────────────────────────────────────────────────────
+// Cloud shape built from overlapping rounded rectangles — easier to tune
+// than a raw Path. Adjust background colour and sizes to taste.
+
+export component RainCloud inherits Rectangle {
+    width: 120px;
+    height: 115px;
+    background: transparent;
+
+    // Main horizontal bar
+    Rectangle {
+        x: 15px; y: 28px;
+        width: 88px; height: 32px;
+        background: #8890a8;
+        border-radius: 16px;
+    }
+    // Left bump
+    Rectangle {
+        x: 12px; y: 14px;
+        width: 36px; height: 36px;
+        background: #8890a8;
+        border-radius: 18px;
+    }
+    // Centre bump (tallest)
+    Rectangle {
+        x: 34px; y: 4px;
+        width: 42px; height: 42px;
+        background: #8890a8;
+        border-radius: 21px;
+    }
+    // Right bump
+    Rectangle {
+        x: 66px; y: 16px;
+        width: 32px; height: 32px;
+        background: #8890a8;
+        border-radius: 16px;
+    }
+
+    // Five drops, evenly spread horizontally, phases spread across the cycle
+    RainDrop { x: 28px;  phase: 0.0;  }
+    RainDrop { x: 43px;  phase: 0.3;  }
+    RainDrop { x: 58px;  phase: 0.6;  }
+    RainDrop { x: 73px;  phase: 0.15; }
+    RainDrop { x: 88px;  phase: 0.45; }
+}

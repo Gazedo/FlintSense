@@ -1,4 +1,7 @@
-import { VerticalBox, HorizontalBox, GroupBox } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
+import { RainCloud } from "weather.slint";
+import { Theme } from "theme.slint";
+import { TvaCard, TvaValue } from "widgets.slint";
 
 export struct NodeData {
     node-id: int,
@@ -12,67 +15,195 @@ export struct NodeData {
     last-seen: string,
 }
 
+// Expand to an enum later
+export struct AppData {
+    current-window: int,
+}
+
+export component HomeView {
+    in property <bool> raining: false;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        HorizontalLayout {
+            spacing: 20px;
+            TvaValue { label: "TEMPERATURE"; text: "--.- C"; }
+            if raining: RainCloud {}
+            if !raining: Text { text: "NO RAIN"; color: Theme.text-dim; vertical-alignment: center; letter-spacing: 1px; }
+            TvaValue { label: "WIND"; text: "-- m/s"; }
+            TvaValue { label: "HUMIDITY"; text: "-- %"; }
+        }
+        HorizontalLayout {
+            spacing: 20px;
+            TvaValue { label: "LAST SEEN";     text: "--:--:-- UTC"; }
+            TvaValue { label: "BATTERY TREND"; text: "--"; }
+            TvaValue { label: "LORA SIGNAL";   text: "--"; }
+            TvaValue { label: "NODE ID";       text: "--"; }
+        }
+    }
+}
+
+export component NodeView {
+    in property <[NodeData]> nodes: [
+        {
+            node-id: 1,
+            temp-c: 28.5,
+            humidity-pct: 42,
+            wind-speed-ms: 3.5,
+            wind-dir-deg: 270,
+            fuel-moisture: 12,
+            battery-soc: 87,
+            battery-mv: 3920,
+            last-seen: "14:32:05 UTC",
+        },
+        {
+            node-id: 2,
+            temp-c: 31.0,
+            humidity-pct: 38,
+            wind-speed-ms: 5.0,
+            wind-dir-deg: 245,
+            fuel-moisture: 9,
+            battery-soc: 23,
+            battery-mv: 3610,
+            last-seen: "14:32:11 UTC",
+        },
+    ];
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        if nodes.length == 0: Text {
+            text: "WAITING FOR NODES...";
+            color: Theme.text-dim;
+            horizontal-alignment: center;
+            letter-spacing: 2px;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 12px;
+                for node in nodes: TvaCard {
+                    title: "NODE " + node.node-id;
+                    HorizontalLayout {
+                        padding: 10px;
+                        spacing: 20px;
+                        TvaValue { label: "TEMP";      text: node.temp-c + " C"; }
+                        TvaValue { label: "HUMIDITY";  text: node.humidity-pct + " %"; }
+                        TvaValue { label: "WIND";      text: node.wind-speed-ms + " m/s @ " + node.wind-dir-deg + " deg"; }
+                        TvaValue { label: "FUEL";      text: node.fuel-moisture + " %"; }
+                        TvaValue { label: "BATTERY";   text: node.battery-soc + " % / " + node.battery-mv + " mV"; }
+                        TvaValue { label: "LAST SEEN"; text: node.last-seen; }
+                    }
+                }
+            }
+        }
+    }
+}
+
 export component MainWindow inherits Window {
     title: "FlintMesh";
     min-width: 700px;
     min-height: 400px;
+    background: Theme.bg;
 
-    in property <[NodeData]> nodes;
+    property <AppData> appdata: { current-window: 1 };
+
+    in property <[NodeData]> nodes: [
+        {
+            node-id: 1,
+            temp-c: 28.5,
+            humidity-pct: 42,
+            wind-speed-ms: 3.5,
+            wind-dir-deg: 270,
+            fuel-moisture: 12,
+            battery-soc: 87,
+            battery-mv: 3920,
+            last-seen: "14:32:05 UTC",
+        },
+        {
+            node-id: 2,
+            temp-c: 31.0,
+            humidity-pct: 38,
+            wind-speed-ms: 5.0,
+            wind-dir-deg: 245,
+            fuel-moisture: 9,
+            battery-soc: 23,
+            battery-mv: 3610,
+            last-seen: "14:32:11 UTC",
+        },
+        {
+            node-id: 3,
+            temp-c: 29.5,
+            humidity-pct: 40,
+            wind-speed-ms: 4.0,
+            wind-dir-deg: 255,
+            fuel-moisture: 11,
+            battery-soc: 23,
+            battery-mv: 3610,
+            last-seen: "14:32:11 UTC",
+        },
+        {
+            node-id: 4,
+            temp-c: 31.0,
+            humidity-pct: 38,
+            wind-speed-ms: 5.0,
+            wind-dir-deg: 245,
+            fuel-moisture: 9,
+            battery-soc: 23,
+            battery-mv: 3610,
+            last-seen: "14:32:11 UTC",
+        },
+        {
+            node-id: 5,
+            temp-c: 30.0,
+            humidity-pct: 39,
+            wind-speed-ms: 4.5,
+            wind-dir-deg: 250,
+            fuel-moisture: 10,
+            battery-soc: 23,
+            battery-mv: 3610,
+            last-seen: "14:32:11 UTC",
+        },
+    ];
     in property <string> mqtt-status: "Disconnected";
 
-    VerticalBox {
+    VerticalLayout {
         padding: 16px;
         spacing: 12px;
 
-        HorizontalBox {
-            Text {
-                text: "FlintMesh";
-                font-size: 22px;
-                font-weight: 700;
-            }
-            Rectangle { horizontal-stretch: 1; }
-            Text {
-                text: "MQTT: " + root.mqtt-status;
-                font-size: 13px;
-            }
-        }
-
-        if nodes.length == 0: Text {
-            text: "Waiting for nodes...";
-            horizontal-alignment: center;
-        }
-
-        for node in nodes: GroupBox {
-            title: "Node " + node.node-id;
-
-            HorizontalBox {
-                spacing: 20px;
-
-                VerticalBox {
-                    Text { text: "Temp"; font-size: 11px; }
-                    Text { text: node.temp-c + " C"; font-weight: 600; }
+        // Header bar
+        Rectangle {
+            background: Theme.surface;
+            border-color: Theme.border;
+            border-width: Theme.border-width;
+            height: 40px;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                Text {
+                    text: "FLINTMESH";
+                    color: Theme.text-primary;
+                    font-size: Theme.font-size-header;
+                    font-weight: 900;
+                    letter-spacing: 4px;
+                    vertical-alignment: center;
                 }
-                VerticalBox {
-                    Text { text: "Humidity"; font-size: 11px; }
-                    Text { text: node.humidity-pct + " %"; font-weight: 600; }
-                }
-                VerticalBox {
-                    Text { text: "Wind"; font-size: 11px; }
-                    Text { text: node.wind-speed-ms + " m/s @ " + node.wind-dir-deg + " deg"; font-weight: 600; }
-                }
-                VerticalBox {
-                    Text { text: "Fuel moisture"; font-size: 11px; }
-                    Text { text: node.fuel-moisture + " %"; font-weight: 600; }
-                }
-                VerticalBox {
-                    Text { text: "Battery"; font-size: 11px; }
-                    Text { text: node.battery-soc + " % / " + node.battery-mv + " mV"; font-weight: 600; }
-                }
-                VerticalBox {
-                    Text { text: "Last seen"; font-size: 11px; }
-                    Text { text: node.last-seen; font-weight: 600; }
+                Rectangle { horizontal-stretch: 1; }
+                Text {
+                    text: "MQTT: " + root.mqtt-status;
+                    color: root.mqtt-status == "Connected" ? Theme.accent : Theme.danger;
+                    font-size: Theme.font-size-label;
+                    letter-spacing: 2px;
+                    vertical-alignment: center;
                 }
             }
         }
+
+        if appdata.current-window == 0: HomeView {}
+        if appdata.current-window == 1: NodeView { nodes: root.nodes; }
     }
 }

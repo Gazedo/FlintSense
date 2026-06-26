@@ -1,0 +1,55 @@
+import { Theme } from "theme.slint";
+
+// Boxy labeled card — TVA-style replacement for GroupBox.
+// accent-color controls both the title bar fill and the outer border.
+export component TvaCard inherits Rectangle {
+    in property <string> title;
+    in property <color> accent-color: Theme.border;
+
+    background: Theme.surface;
+    border-color: accent-color;
+    border-width: Theme.border-width;
+    border-radius: 0px;
+
+    VerticalLayout {
+        Rectangle {
+            background: accent-color;
+            height: 20px;
+            HorizontalLayout {
+                padding-left: 6px;
+                alignment: start;
+                Text {
+                    text: title;
+                    color: Theme.bg;
+                    font-size: Theme.font-size-label;
+                    font-weight: 900;
+                    letter-spacing: 2px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+        @children
+    }
+}
+
+// Two-line label + value pair in TVA amber tones.
+export component TvaValue {
+    in property <string> label;
+    in property <string> text;
+
+    VerticalLayout {
+        spacing: 2px;
+        Text {
+            text: label;
+            color: Theme.text-dim;
+            font-size: Theme.font-size-label;
+            letter-spacing: 1px;
+        }
+        Text {
+            text: text;
+            color: Theme.text-primary;
+            font-size: Theme.font-size-body;
+            font-weight: 700;
+        }
+    }
+}
