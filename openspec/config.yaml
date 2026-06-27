@@ -2,19 +2,82 @@ schema: spec-driven
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  ## FlintMesh — wildfire early-warning sensor network
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  A distributed, solar-powered LoRa sensor network that measures fire-weather
+  conditions (temperature, humidity, wind, dead-fuel moisture, gas/VOC as a
+  smoke/combustion proxy, plus battery/solar telemetry) in real time. Readings
+  feed fire-danger models — Fire Weather Index (FWI) and NFDRS — used by land
+  managers and fire agencies. Everything is written in Rust.
+
+  ## Topology / data flow
+
+      flint-node (sensor) --LoRa--> flint-bridge (RX + relay) --USB serial-->
+      flint-gateway (host) --MQTT/JSON--> broker --> flint-ui (dashboard)
+
+  Mesh routing is flood routing with hop-limit deduplication (Meshtastic-style):
+  a SeenCache rejects already-seen packet_ids; frames with hop_limit > 0 are
+  rebroadcast. The wire format is the single source of truth in `flint-proto`,
+  shared by firmware and host so they can never disagree.
+
+  ## Crates and their stacks
+
+  - **flint-proto** (`no_std`, any target): shared packet types
+    (`MeshEnvelope`, `WeatherPacket`/`FlintPayload`), `SeenCache`, and the
+    bridge binary record framing `[sync][tag][len][body][CRC-16]`
+    (`FrameReport`/`RawFrame`). Uses `postcard` for envelope serialization and
+    `heapless` for no-alloc buffers; optional `defmt` feature for firmware.
+    Authoritative for the wire format and for fixed-point field encodings.
+
+  - **flint-node** (RAK4631 / Nordic nRF52840, `thumbv7em-none-eabihf`,
+    nightly): sensor-node firmware. Embassy async executor, `lora-phy` driving
+    an SX1262, BME680 (RAK1906) for temp/humidity/gas. Logs over RTT via
+    `defmt`/probe-rs (SWD); custom LED-blink panic handler so failures are
+    visible on bare USB / battery with no probe attached. Standalone Cargo
+    workspace.
+
+  - **flint-bridge** (Heltec WiFi LoRa 32 V2 / ESP32, `xtensa-esp32-none-elf`,
+    `esp` toolchain): LoRa RX + transparent mesh relay + USB binary bridge.
+    `esp-hal` 1.0 + `esp-rtos` (Embassy), `lora-phy` driving an SX1276, SSD1306
+    OLED. Emits `FrameReport`/`RawFrame` binary records over USB serial at
+    921600 baud; binary-by-default with single-byte mode commands (`b` binary,
+    `d` human-readable debug + trace logs). Standalone Cargo workspace.
+
+  - **flint-gateway** (host: Raspberry Pi or dev machine, `std`): reads the
+    bridge USB stream with the `serialport` crate, decodes records via
+    `flint-proto` (resyncs on the sync word, validates CRC), and republishes.
+    The blocking serial read owns the main loop; downstream publishing happens
+    on worker threads/sinks (MQTT now, remote HTTP/timeseries later) so a slow
+    or down sink never stalls packet reception.
+
+  - **flint-ui** (`std`, Slint desktop dashboard): the MQTT consumer.
+    `rumqttc` 0.24 subscriber + `serde_json`. Subscribes
+    `<topic_prefix>/node/+/weather` and renders per-node fire-weather readings.
+
+  ## MQTT contract (consumer-defined, by flint-ui)
+
+  - Topic: `<topic_prefix>/node/<node_id>/weather` (prefix from `config.json`,
+    default `flintmesh`).
+  - Payload: JSON object; flint-ui deserializes `node_id, temp_c (f64),
+    humidity_pct, wind_speed_ms (f64), wind_dir_deg, fuel_moisture,
+    battery_soc, battery_mv`. It does NOT use `deny_unknown_fields`, so the
+    gateway may publish a richer superset (link quality, sequence, gas) safely.
+  - QoS AtLeastOnce. Shared `config.json` keys: `mqtt_host`, `mqtt_port`,
+    `topic_prefix`.
+
+  ## Conventions
+
+  - Fixed-point on the wire, floats downstream: `WeatherPacket.temp_c` is
+    °C×100, `wind_speed_ms` is m/s×2; the gateway scales these to floats when
+    publishing. Other weather fields pass through unscaled.
+  - `flint-proto` is the only place the wire format / framing is defined; the
+    device producer and host consumer must share it.
+  - Firmware crates (`flint-node`, `flint-bridge`) are standalone workspaces:
+    different MCUs, toolchains, and mutually-exclusive Embassy/critical-section
+    features that cannot share one dependency graph. Build each on its own.
+  - Git: the user performs all git operations. Never create branches,
+    worktrees, or commits unless explicitly asked.
+  - Note: the root README still shows some earlier intentions (ESP32 nodes,
+    InfluxDB+Grafana); the descriptions above reflect the current code and
+    direction (nRF52840 nodes, MQTT + Slint).
