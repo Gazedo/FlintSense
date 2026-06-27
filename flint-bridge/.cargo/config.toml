@@ -7,5 +7,7 @@ target = "xtensa-esp32-none-elf"
 [unstable]
 build-std = ["core"]
 
+# TRACE so debug mode can reach trace-level logs; the firmware gates emission at
+# runtime with log::set_max_level (Off in binary mode, Trace in debug mode).
 [env]
-ESP_LOG = "INFO"
+ESP_LOG = "TRACE"

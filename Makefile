@@ -1,13 +1,13 @@
 .PHONY: all build flash clean check \
         node node-release node-flash node-erase \
-        debug debug-release debug-flash \
+        bridge bridge-release bridge-flash \
         gateway gateway-release \
         ui ui-release \
         hardware hardware-export
 
 # ── Default ───────────────────────────────────────────────────────────────────
 
-all build: node debug gateway ui
+all build: node bridge gateway ui
 
 # ── flint-node (RAK4631 / nRF52840, thumbv7em-none-eabihf) ───────────────────
 
@@ -26,16 +26,16 @@ node-flash:
 node-erase:
 	probe-rs erase --chip nRF52840_xxAA
 
-# ── flint-debug (Heltec V2 / ESP32 Xtensa, xtensa-esp32-none-elf) ────────────
+# ── flint-bridge (Heltec V2 / ESP32 Xtensa, xtensa-esp32-none-elf) ───────────
 
-debug:
-	cd flint-debug && cargo build
+bridge:
+	cd flint-bridge && cargo build
 
-debug-release:
-	cd flint-debug && cargo build --release
+bridge-release:
+	cd flint-bridge && cargo build --release
 
-debug-flash:
-	cd flint-debug && cargo run --release
+bridge-flash:
+	cd flint-bridge && cargo run --release
 
 # ── flint-gateway (host) ──────────────────────────────────────────────────────
 
@@ -65,12 +65,12 @@ hardware-export:
 
 check:
 	cargo check -p flint-proto -p flint-node
-	cd flint-debug && cargo check
+	cd flint-bridge && cargo check
 	cd flint-gateway && cargo check
 	cd flint-ui && cargo check
 
 clean:
 	cargo clean
-	cd flint-debug && cargo clean
+	cd flint-bridge && cargo clean
 	cd flint-ui && cargo clean
 

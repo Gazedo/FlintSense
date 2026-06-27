@@ -17,8 +17,8 @@ Raspberry Pi.
 ┌─────────────────────────────────────────────────────────────┐
 │                        LoRa Mesh                            │
 │                                                             │
-│   [Sensor Node] ──LoRa──▶ [Relay Node] ──LoRa──▶ [Gateway] │
-│   (flint-node)           (flint-debug)          (flint-   │
+│   [Sensor Node] ──LoRa──▶ [Bridge Node] ──LoRa──▶ [Gateway] │
+│   (flint-node)           (flint-bridge)         (flint-   │
 │                                                    gateway) │
 └─────────────────────────────────────────────────────────────┘
          │                                        │
@@ -40,9 +40,9 @@ the gateway always agree on the wire format.
 | Crate | Target | Description |
 |---|---|---|
 | [`flint-proto`](./flint-proto) | `no_std` (any) | Shared packet types, mesh envelope, seen-packet cache, postcard encode/decode |
-| [`flint-debug`](./flint-debug) | `xtensa-esp32-none-elf` | LoRa RX + transparent mesh relay on Heltec WiFi LoRa 32 V2 |
+| [`flint-bridge`](./flint-bridge) | `xtensa-esp32-none-elf` | LoRa RX + transparent mesh relay + USB binary bridge on Heltec WiFi LoRa 32 V2 |
 | [`flint-node`](./flint-node) | `xtensa-esp32-none-elf` | Sensor node firmware on Heltec WiFi LoRa 32 V2 (TX test → real sensors in progress) |
-| `flint-gateway` *(planned)* | host (RPi) | Packet receiver, InfluxDB writer, Grafana integration |
+| `flint-gateway` | host (RPi) | Serial reader/decoder for the bridge stream (InfluxDB + Grafana integration planned) |
 
 ---
 
@@ -63,7 +63,7 @@ the gateway always agree on the wire format.
 ### Development (Phase 0) — current
 - **Heltec WiFi LoRa 32 V2** — ESP32 + SX1276 + OLED, used for all firmware
   development.  Two boards: one running `flint-node` (TX), one running
-  `flint-debug` (RX + relay).
+  `flint-bridge` (RX + relay + USB bridge).
 
 ### Production Node (Phase 1)
 - **M5Stack Stamp-C3U** (ESP32-C3, ~5 µA deep sleep) + harvested SX1276
@@ -103,7 +103,7 @@ cargo build --workspace
 
 # Or a single crate
 cargo build -p flint-node
-cargo build -p flint-debug
+cd flint-bridge && cargo build
 ```
 
 ### Flash & Monitor
@@ -112,8 +112,8 @@ Set your USB port in `.cargo/config.toml` (workspace root), then:
 
 ```bash
 # Flash and open serial monitor
-cd flint-node  && cargo run --release
-cd flint-debug && cargo run --release
+cd flint-node   && cargo run --release
+cd flint-bridge && cargo run --release
 ```
 
 Log output streams over UART via `espflash --monitor`.
@@ -131,8 +131,8 @@ cargo doc --workspace --no-deps --open
 | Step | Status | Description |
 |---|---|---|
 | 1 | ✅ | **Arduino loopback** — confirmed RF link on two Heltec V2 boards |
-| 2 | ✅ | **Rust RX ↔ Arduino TX** — `flint-debug` receiving from factory firmware, validated `lora-phy` config |
-| 3 | ✅ | **Full Rust both sides** — `flint-node` TX and `flint-debug` RX passing `MeshEnvelope` packets end-to-end |
+| 2 | ✅ | **Rust RX ↔ Arduino TX** — `flint-bridge` receiving from factory firmware, validated `lora-phy` config |
+| 3 | ✅ | **Full Rust both sides** — `flint-node` TX and `flint-bridge` RX passing `MeshEnvelope` packets end-to-end |
 | 4 | 🔄 | **Sensor integration** — fuel moisture (ADC resistive dowel), SHT40 (I2C), MAX17048 (I2C) |
 | 5 | ⬜ | **Anemometer pulse counting** — GPIO interrupt task |
 | 6 | ⬜ | **RPi gateway** — `flint-gateway` receiving packets, writing to InfluxDB |

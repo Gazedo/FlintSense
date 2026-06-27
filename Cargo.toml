@@ -7,11 +7,11 @@ members = [
     "flint-ui",
 ]
 # The firmware crates are standalone workspaces: they target different MCUs
-# (flint-node → nRF52840/thumbv7em, flint-debug → ESP32/xtensa) with their own
+# (flint-node → nRF52840/thumbv7em, flint-bridge → ESP32/xtensa) with their own
 # toolchains, build-std settings, and mutually-exclusive critical-section / embassy
 # arch features that cannot share one unified dependency graph.
 # Build each independently: cd flint-node && cargo build
-exclude = ["flint-node", "flint-debug"]
+exclude = ["flint-node", "flint-bridge"]
 resolver = "2"
 
 [profile.dev]

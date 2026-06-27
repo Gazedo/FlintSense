@@ -1,12 +1,12 @@
 [package]
-name = "flint-debug"
+name = "flint-bridge"
 version = "0.1.0"
 edition = "2024"
-description = "LoRa receive + mesh relay debug firmware for Heltec WiFi LoRa 32 V2 (ESP32)"
+description = "LoRa receive + mesh relay + USB bridge firmware for Heltec WiFi LoRa 32 V2 (ESP32)"
 readme = "README.md"
 
 [[bin]]
-name = "flint-debug"
+name = "flint-bridge"
 path = "src/main.rs"
 
 [dependencies]
@@ -22,6 +22,11 @@ esp-println            = { version = "0.16", features = ["esp32", "log-04"] }
 # Embassy async runtime (pulled transitively by esp-rtos but needed for #[task] and Spawner)
 embassy-executor = { version = "0.9" }
 embassy-time     = { version = "0.5" }
+# Channel between the RX loop and the display task.
+embassy-sync     = { version = "0.7" }
+
+# no_std stack strings for rendering display lines without an allocator.
+heapless = { version = "0.8" }
 
 # LoRa radio driver — SX1276 on Heltec V2
 lora-phy         = { version = "3" }
@@ -30,7 +35,7 @@ lora-phy         = { version = "3" }
 embedded-hal-bus = { version = "0.2", features = ["async"] }
 
 # OLED display (SSD1306 on Heltec V2 via I2C)
-ssd1306           = { version = "0.9" }
+ssd1306           = { version = "0.10", features = ["async"] }
 embedded-graphics = { version = "0.8" }
 
 # Logging

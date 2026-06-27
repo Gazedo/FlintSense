@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# Shared wire format — decodes the bridge's binary records (no_std lib, std-safe).
+flint-proto = { path = "../flint-proto" }
+# Host serial port access for reading the flint-bridge USB stream.
+serialport = "4"

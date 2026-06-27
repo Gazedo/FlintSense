@@ -3,7 +3,7 @@
 LoRa transmit test firmware for the **Heltec WiFi LoRa 32 V2** (ESP32 + SX1276).
 
 Sends a `MeshEnvelope` containing a fake `WeatherPacket` every 5 seconds.
-Use alongside `flint-debug` on a second board to verify the full TX → RX → decode
+Use alongside `flint-bridge` on a second board to verify the full TX → RX → decode
 path before connecting real sensors.
 
 ## Hardware
@@ -33,7 +33,7 @@ runner = "espflash flash --monitor --baud 921600 --port /dev/cu.usbserial-XXXX"
 
 LoRa modem settings (`LORA_FREQUENCY_HZ`, `LORA_SF`, `LORA_BW`, `LORA_CR`) are
 constants at the top of `src/main.rs` and **must match** the values in
-`flint-debug` exactly.
+`flint-bridge` exactly.
 
 `NODE_ADDR` and `NODE_ID` are hardcoded test values. When real sensor hardware
 is added these will be derived from the chip MAC address.
